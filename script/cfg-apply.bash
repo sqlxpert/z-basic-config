@@ -28,29 +28,41 @@
 
 
 set -o errexit  # Exit script on any error
+set -o noglob  # Mitigate an injection risk when Profiles tag contains `*`
+
+
+# All jq calls involve:
+# 1. --raw-output , which strips quotes from an output string.
+# 2. --exit-status , which produces a non-zero exit status when the filter
+#    returns null, as happens when a given key is not present in an object.
+JQ_OPTS='--raw-output --exit-status'
+# 3. A trailing filter intended to prevent command injection by producing
+#    null when a value is not a string, is an empty string, or contains
+#    unexpected characters. Expand character set if necessary.
+#    Shortcoming: jq fails silently.
+JQ_CHECK=' | if type == "string" and test("^[-_a-zA-Z0-9.,+=/]+$") then . else null end'
 
 
 # You'd want to cache the configuration in a more durable place, in practice
 CFGDIR='/tmp/cfg'
 CFGDIR_OLD="${CFGDIR}-old"
-export CFGDIR CFGDIR_OLD  # For convenience when troubleshooting!
 if [ -d "${CFGDIR}" ]
 then
   mv "${CFGDIR}" "${CFGDIR_OLD}"
 fi
 mkdir --parents "${CFGDIR}"
-chmod 'g-rwx,o-rwx' "${CFGDIR}"
+chmod 'g-rwx,o-rwx' "${CFGDIR}"  # Very basic access control
 
 
-# Use a tag, which is a property of the EC2 instance, to select configuration profiles,
-# which must be separated by spaces. IAM policies (condition keys: aws:RequestTag and
-# ec2:ResourceTag) should be used to restrict creation and modification of this tag.
-# Profiles would have to be specified some other way to use this script outside EC2.
+# Use a tag, which is a property of the EC2 instance, to select configuration profiles.
+# IAM policies (condition keys: aws:RequestTag and ec2:ResourceTag) should be used to
+# restrict creation and modification of this tag. Profiles would have to be selected
+# some other way if this script were used outside EC2.
 AWS_DEFAULT_REGION=$(
   /usr/bin/curl \
     --silent --max-time 5 \
     'http://169.254.169.254/latest/dynamic/instance-identity/document' \
-  | jq --raw-output '.["region"]'
+  | jq $JQ_OPTS '.["region"]'"${JQ_CHECK}"
 )
 export AWS_DEFAULT_REGION
 EC2_INST_ID=$(
@@ -63,9 +75,14 @@ PROFILES=$(
     --filters "Name=resource-id,Values=${EC2_INST_ID}" "Name=key,Values=Profiles" \
     --query 'Tags[0].Value' --output text
 )
+# Security note: Quoting ensures that the expression containing EC2_INST_ID,
+# which is obtained using curl, is treated as single word, mitigating a far-fetched
+# (one would have to spoof the EC2 metadata service) command injection risk.
 
 
-# Multiple configuration profiles can be applied to one EC2 instance
+# Multiple configuration profiles can be applied to one EC2 instance.
+# Multiple profile names in the Profiles tag must be separated by spaces;
+# failure to do this simply produces no match on any profile name.
 for PROFILE in $PROFILES
 do
 
@@ -80,6 +97,12 @@ do
   # Why repeat this for each profile instead of doing it once, for the whole configuration
   # hierarchy? To download only the applicable profiles. IAM policies attached to the EC2
   # instance role should be used to prevent access to other, potentially sensitive, profiles.
+
+  # Security note: Quoting ensures that any expression containing components of an S3
+  # object key (PROFILEDIR is such a component, as is ITEM_NAME, below) is treated as a
+  # single word, mitigating the command injection risk. Other variables in those expressions
+  # are set to literal values inside this script (ITEM_TYPE, below, is an example), or
+  # are obtained from jq, which is always called with safeguards against command injection.
 
   PROFILEDIR_OLD="${CFGDIR_OLD}/${PROFILE}"
   PROFILE_CHANGED=1
@@ -132,15 +155,12 @@ do
       #   svc       Exact name of service to be restarted
       # Additional files and/or metadata properties are required for some item types.
       ITEM_META="${PROFILEDIR}/${ITEM_TYPE}/${ITEM_NAME}/metadata.json"
-      ITEM_ACTION=$( jq --raw-output '.["action"]' "${ITEM_META}" )
-      ITEM_ID=$( jq --raw-output '.["id"]' "${ITEM_META}" )
+      ITEM_ACTION=$( jq $JQ_OPTS '.["action"]'"${JQ_CHECK}" "${ITEM_META}" )
+      ITEM_ID=$( jq $JQ_OPTS '.["id"]'"${JQ_CHECK}" "${ITEM_META}" )
       case $ITEM_TYPE in
 
         # All of the actions that follow are potentially dangerous.
         # Basic safeguards against command injection are implemented.
-        # DONE: action
-        # TODO: id and item type-specific properties
-        # TODO: defaults for item type-specific properties
 
         'pkg')
           case $ITEM_ACTION in
@@ -156,11 +176,11 @@ do
         'file')
           case $ITEM_ACTION in
             'overwrite')
-              FILE_USER=$( jq --raw-output '.["user"]' "${ITEM_META}" )
-              FILE_GROUP=$( jq --raw-output '.["group"]' "${ITEM_META}" )
-              FILE_MODE=$( jq --raw-output '.["mode"]' "${ITEM_META}" )
+              FILE_USER=$( jq $JQ_OPTS '.["user"]'"${JQ_CHECK}" "${ITEM_META}" )
+              FILE_GROUP=$( jq $JQ_OPTS '.["group"]'"${JQ_CHECK}" "${ITEM_META}" )
+              FILE_MODE=$( jq $JQ_OPTS '.["mode"]'"${JQ_CHECK}" "${ITEM_META}" )
               
-              # For security, never popular a file before permissions are set.
+              # For security, never populate a file until permissions have been set.
 
               # If file exists, update access time only (do not update modification timestamp):
               sudo touch -a "${ITEM_ID}"
@@ -168,8 +188,8 @@ do
               # or mode actually changes; print changes, for information:
               sudo chown --changes "${FILE_USER}:${FILE_GROUP}" "${ITEM_ID}"
               sudo chmod --changes "${FILE_MODE}" "${ITEM_ID}"
-              # Unlike cp, this copies only when contents change, otherwise preserving
-              # modification timestamp; print changes (crypitcally, alas):
+              # Unlike cp, this copies only when contents change, preserving the
+              # modification timestamp otherwise; print changes (crypitcally, alas):
               sudo rsync --checksum --inplace --itemize-changes \
                 "${PROFILEDIR}/${ITEM_TYPE}/${ITEM_NAME}/source" "${ITEM_ID}"
               ;;
@@ -185,7 +205,7 @@ do
         'link')
           case $ITEM_ACTION in
             'overwrite')
-              LINK_TARGET=$( jq --raw-output '.["target"]' "${ITEM_META}" )
+              LINK_TARGET=$( jq $JQ_OPTS '.["target"]'"${JQ_CHECK}" "${ITEM_META}" )
               sudo ln --symbolic --force "${LINK_TARGET}" "${ITEM_ID}"
               ;;
             'delete')
