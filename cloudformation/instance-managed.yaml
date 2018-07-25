@@ -1,0 +1,52 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: "Config mgmt: Managed EC2 instance | Paul Marcelin | July, 2018"
+
+Parameters:
+
+  ImageId:
+    Type: "AWS::EC2::Image::Id"
+    Description: "Identifier of the Amazon Machine Image for the new EC2 instance. Choose you region's current Ubuntu 18.04 hvm:ebs-ssd AMI (the default is the us-east-1 July 24, 2018 release) from https://cloud-images.ubuntu.com/locator/ec2/"
+    Default: "ami-b04847cf"
+
+  InstanceType:
+    Type: String
+    Description: "EC2 instance type, from https://aws.amazon.com/ec2/instance-types/"
+    Default: "t2.nano"
+
+  KeyName:
+    Type: String
+    Description: "Name of an existing SSH key pair, for the new EC2 instance"
+
+  SubnetId:
+    Type: "AWS::EC2::Subnet::Id"
+    Description: "Identifier of the subnet in which the EC2 instance will be created; must be from the same VPC chosen when the central.yaml stack was created"
+
+Resources:
+
+  ConfigManagedEC2Inst:
+    Type: "AWS::EC2::Instance"
+    DeletionPolicy: Delete
+    Properties:
+      BlockDeviceMappings: 
+        - DeviceName: "/dev/sda1"
+          Ebs:
+            DeleteOnTermination: true
+            VolumeType: gp2
+            VolumeSize: 10
+      IamInstanceProfile: !ImportValue "IAMEC2InstProf-ConfigManaged-Name"
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - DeviceIndex: 0
+          AssociatePublicIpAddress: true
+          DeleteOnTermination: true
+          GroupSet:
+            - !ImportValue "VPCSecGrp-ConfigEc2InstLogin-Id"
+            - !ImportValue "VPCSecGrp-ConfigExampleWeb-Id"
+          SubnetId: !Ref SubnetId
+      Tags:
+        - { Key: Name, Value: !Sub "config-managed-${AWS::StackName}" }
+        - { Key: Profiles, Value: "" }
