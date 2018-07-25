@@ -1,0 +1,128 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: "Config mgmt: S3 bucket, IAM policies, EC2 instance role | Paul Marcelin | July, 2018"
+
+Resources:
+
+  ConfigBucket:
+    Type: "AWS::S3::Bucket"
+    DeletionPolicy: Retain
+    Properties: 
+      VersioningConfiguration:
+        Status: Enabled
+
+  ConfigManagePolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    DeletionPolicy: Retain
+    Properties:
+      Description: "Config mgmt: S3 config store bucket: upload, list, download, delete objects; S3: list names of all buckets; EC2: set, delete Profiles instance tag and describe all resources; STS: decode permissions errors. Temporarily attach to EC2 instance role for instance from which files will be uploaded, etc., or to IAM user whose API key will be used on a non-EC2 system."
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: "s3:ListAllMyBuckets"
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - "s3:ListBucket"
+            Resource: !GetAtt ConfigBucket.Arn
+          - Effect: Allow
+            Action:  # Action wildcard supports versioned objects
+              - "s3:PutObject*"
+              - "s3:GetObject*"
+              - "s3:DeleteObject*"
+            Resource: !Sub "${ConfigBucket.Arn}/*"
+          - Effect: Allow
+            Action:
+              - "ec2:CreateTags"
+              - "ec2:DeleteTags"
+            Resource: !Sub "arn:aws:ec2:*:${AWS::AccountId}:instance/*"
+            Condition:
+              "ForAllValues:StringEquals":
+                "aws:TagKeys":
+                  - "Profiles"
+          - Effect: Allow
+            Action:
+              - "ec2:Describe*"
+            Resource: "*"
+          - Effect: Allow
+            Action: "sts:DecodeAuthorizationMessage"
+            Resource: "*"
+
+  ConfigApplyPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    DeletionPolicy: Retain
+    Properties:
+      Description: "Config mgmt: S3 config store bucket: list, download objects; S3: list names of all buckets; EC2: get all tags; STS: decode permissions errors. Permanently attach to EC2 instance role for managed instances."
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: "s3:ListAllMyBuckets"
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - "s3:ListBucket"
+            Resource: !GetAtt ConfigBucket.Arn
+          - Effect: Allow
+            Action:   # Action wildcard supports versioned objects
+              - "s3:GetObject*"
+            Resource: !Sub "${ConfigBucket.Arn}/*"
+          - Effect: Allow
+            Action:
+              - "ec2:DescribeTags"
+            Resource: "*"
+          - Effect: Allow
+            Action: "sts:DecodeAuthorizationMessage"
+            Resource: "*"
+
+  ConfigManagedEC2InstRole:
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: Retain
+    Properties:
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - "ec2.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Ref ConfigApplyPolicy
+
+  ConfigManagedEC2InstProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    DeletionPolicy: Retain
+    Properties:
+      Roles:
+        - !Ref ConfigManagedEC2InstRole
+
+Outputs:
+  ConfigBucketName:
+    Value: !Ref ConfigBucket
+    Description: "Config mgmt: name of S3 bucket for configuration data"
+    Export:
+      Name: "S3-ConfigBucket-Name"
+  ConfigBucketArn:
+    Value: !GetAtt ConfigBucket.Arn
+    Description: "Config mgmt: ARN of S3 bucket for configuration data"
+    Export:
+      Name: "S3-ConfigBucket-Arn"
+  ConfigManagePolicyArn:
+    Value: !Ref ConfigManagePolicy
+    Description: "Config mgmt: ARN of IAM policy allowing management of configuration data"
+    Export:
+      Name: "IAMPol-ConfigManage-Arn"
+  ConfigApplyPolicyArn:
+    Value: !Ref ConfigApplyPolicy
+    Description: "Config mgmt: ARN of IAM policy allowing application of configurations"
+    Export:
+      Name: "IAMPol-ConfigApply-Arn"
+  ConfigManagedEC2InstProfile:
+    Value: !Ref ConfigManagedEC2InstProfile
+    Description: "Config mgmt: name of IAM EC2 instance profile (container for instance role) for managed instances"
+    Export:
+      Name: "IAMEC2InstProfile-ConfigManaged-Name"
