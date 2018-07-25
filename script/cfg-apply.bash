@@ -5,7 +5,9 @@
 
 # Warnings:
 #  - Do not use for production
-#  - TODO: Rudimentary error-handling
+#  - Simple error handling: any error causes script
+#    to exit. Examine output up to that point, and
+#    cached configuration data in `$CFGDIR` and `$CFGDIR_OLD`
 #  - No configuration management system can prevent a
 #    user from explicitly removing a crucial package,
 #    file, etc. -- whether intentionally or by accident
@@ -25,9 +27,13 @@
 #  - User with passwordless sudo privileges (typically, `ubuntu`)
 
 
+set -o errexit  # Exit script on any error
+
+
 # You'd want to cache the configuration in a more durable place, in practice
 CFGDIR='/tmp/cfg'
 CFGDIR_OLD="${CFGDIR}-old"
+export CFGDIR CFGDIR_OLD  # For convenience when troubleshooting!
 if [ -d "${CFGDIR}" ]
 then
   mv "${CFGDIR}" "${CFGDIR_OLD}"
@@ -66,6 +72,7 @@ do
   echo
   echo
   echo "Profile: ${PROFILE}"
+  echo
 
   PROFILEDIR="${CFGDIR}/${PROFILE}"
   mkdir "${PROFILEDIR}"
@@ -75,17 +82,22 @@ do
   # instance role should be used to prevent access to other, potentially sensitive, profiles.
 
   PROFILEDIR_OLD="${CFGDIR_OLD}/${PROFILE}"
-  PROFILE_CHANGED=0
+  PROFILE_CHANGED=1
   if [ -d "${PROFILEDIR_OLD}" ]
   then
-    diff --recursive --brief "${PROFILEDIR_OLD}" "${PROFILEDIR}"
-    PROFILE_CHANGED=$?
     # Detect explicit configuration changes, which will trigger service restarts. I
     # have deliberately decided NOT to handle operating system package updates, as that
     # would require the user to list all relevant packages (including dependencies, to
     # an arbitrary level of depth) and request a specific version of each package (cf.
     # `pip freeze` in the context of Python or `npm shrinkwrap` in the context of JaveScript).
     # Also needed would be a mechanism to track update status across all managed systems.
+
+    # Temporarily allow script to continue in case diff
+    # returns a non-zero status, indicating a profile update.
+    set +o errexit
+    diff --recursive --brief "${PROFILEDIR_OLD}" "${PROFILEDIR}"
+    PROFILE_CHANGED=$?
+    set -o errexit
   fi
 
   # In the absence of a dependency system, process configuration
@@ -133,8 +145,7 @@ do
         'pkg')
           case $ITEM_ACTION in
             'install'|'remove')
-              sudo apt-get "${ITEM_ACTION}" "${ITEM_ID}"
-              # TODO --assume-yes
+              sudo apt-get --assume-yes --no-upgrade "${ITEM_ACTION}" "${ITEM_ID}"
               ;;
             *)
               echo "Unknown action ${ITEM_ACTION}"
@@ -151,7 +162,7 @@ do
               sudo touch "${ITEM_ID}"
               sudo chown "${FILE_USER}:${FILE_GROUP}" "${ITEM_ID}"
               sudo chmod "${FILE_MODE}" "${ITEM_ID}"
-              sudo cp "${PROFILEDIR}/file/${FILE}/source" "${ITEM_ID}"
+              sudo cp "${PROFILEDIR}/${ITEM_TYPE}/${ITEM_NAME}/source" "${ITEM_ID}"
               ;;
             'delete')
               sudo rm --force "${ITEM_ID}"
@@ -166,7 +177,7 @@ do
           case $ITEM_ACTION in
             'overwrite')
               LINK_TARGET=$( jq --raw-output '.["target"]' "${ITEM_META}" )
-              sudo ln --symbolic "${LINK_TARGET}" "${ITEM_ID}"
+              sudo ln --symbolic --force "${LINK_TARGET}" "${ITEM_ID}"
               ;;
             'delete')
               sudo rm --force "${ITEM_ID}"
