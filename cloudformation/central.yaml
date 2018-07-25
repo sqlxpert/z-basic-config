@@ -1,14 +1,20 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
 
-Description: "Config mgmt: S3 bucket, IAM policies, EC2 instance role | Paul Marcelin | July, 2018"
+Description: "Config mgmt: S3 bucket, IAM policies, EC2 instance roles, VPC security groups | Paul Marcelin | July, 2018"
+
+Parameters:
+
+  VpcId:
+    Type: "AWS::EC2::VPC::Id"
+    Description: "Identifier of the Virtual Private Cloud in which EC2 instances will later be created; if unsure, select the default VPC"
 
 Resources:
 
   ConfigBucket:
     Type: "AWS::S3::Bucket"
     DeletionPolicy: Retain
-    Properties: 
+    Properties:
       VersioningConfiguration:
         Status: Enabled
 
@@ -81,14 +87,14 @@ Resources:
     Type: "AWS::IAM::Role"
     DeletionPolicy: Retain
     Properties:
-      AssumeRolePolicyDocument: 
+      AssumeRolePolicyDocument:
         Version: "2012-10-17"
-        Statement: 
+        Statement:
           - Effect: "Allow"
-            Principal: 
-              Service: 
+            Principal:
+              Service:
                 - "ec2.amazonaws.com"
-            Action: 
+            Action:
               - "sts:AssumeRole"
       ManagedPolicyArns:
         - !Ref ConfigApplyPolicy
@@ -100,17 +106,91 @@ Resources:
       Roles:
         - !Ref ConfigManagedEC2InstRole
 
+  ConfigCentralEC2InstRole:
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: Retain
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Ref ConfigManagePolicy
+
+  ConfigCentralEC2InstProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    DeletionPolicy: Retain
+    Properties:
+      Roles:
+        - !Ref ConfigCentralEC2InstRole
+
+  ConfigEc2InstLoginSecGrp:
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: Retain
+    Properties:
+      GroupDescription: !Sub "Config mgmt: Login access from public Internet. Attach to the central EC2 instance and all managed instances. Not safe for production!"
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: "-1"  # All traffic
+          CidrIp: "127.0.0.1/32"  # Loopback interface
+          Description: "Dummy to prevent CloudFormation from automatically creating a rule allowing all outbound traffic"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: "0.0.0.0/0"
+          Description: "SSH from public Internet. Not safe for production!"
+
+  ConfigEc2InstLoginSecGrp:
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: Retain
+    Properties:
+      GroupDescription: !Sub "Config mgmt: Login access from public Internet. Attach to the central EC2 instance and all managed instances. Not safe for production!"
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: "-1"  # All traffic
+          CidrIp: "127.0.0.1/32"  # Loopback interface
+          Description: "Dummy to prevent CloudFormation from automatically creating a rule allowing all outbound traffic"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: "0.0.0.0/0"
+          Description: "SSH from public Internet. Not safe for production!"
+
+  ConfigExampleWebSecGrp:
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: Retain
+    Properties:
+      GroupDescription: !Sub "Config mgmt: Web traffic from public Internet. Attach to managed EC2 instances (and load balancers, if present) when using a sample profile that defines a Web server, such as the php-nginx profile. Not safe for production without DDoS attack protection!"
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: "-1"  # All traffic
+          CidrIp: "127.0.0.1/32"  # Loopback interface
+          Description: "Dummy to prevent CloudFormation from automatically creating a rule allowing all outbound traffic"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: "0.0.0.0/0"
+          Description: "HTTP from public Internet. Not safe for production without DDoS attack protection!"
+
 Outputs:
   ConfigBucketName:
     Value: !Ref ConfigBucket
     Description: "Config mgmt: name of S3 bucket for configuration data"
     Export:
-      Name: "S3-ConfigBucket-Name"
+      Name: "S3Buck-Config-Name"
   ConfigBucketArn:
     Value: !GetAtt ConfigBucket.Arn
     Description: "Config mgmt: ARN of S3 bucket for configuration data"
     Export:
-      Name: "S3-ConfigBucket-Arn"
+      Name: "S3Buck-Config-Arn"
   ConfigManagePolicyArn:
     Value: !Ref ConfigManagePolicy
     Description: "Config mgmt: ARN of IAM policy allowing management of configuration data"
@@ -125,4 +205,19 @@ Outputs:
     Value: !Ref ConfigManagedEC2InstProfile
     Description: "Config mgmt: name of IAM EC2 instance profile (container for instance role) for managed instances"
     Export:
-      Name: "IAMEC2InstProfile-ConfigManaged-Name"
+      Name: "IAMEC2InstProf-ConfigManaged-Name"
+  ConfigCentralEC2InstProfile:
+    Value: !Ref ConfigCentralEC2InstProfile
+    Description: "Config mgmt: name of IAM EC2 instance profile (container for instance role) for central instance"
+    Export:
+      Name: "IAMEC2InstProf-ConfigCentral-Name"
+  ConfigEc2InstLoginSecGrp:
+    Value: !Ref ConfigEc2InstLoginSecGrp
+    Description: "Config mgmt: ID of security group allowing login access to EC2 instances"
+    Export:
+      Name: "VPCSecGrp-ConfigEc2InstLogin-Id"
+  ConfigExampleWebSecGrp:
+    Value: !Ref ConfigExampleWebSecGrp
+    Description: "Config mgmt: ID of example security group allowing Web traffic"
+    Export:
+      Name: "VPCSecGrp-ConfigExampleWeb-Id"
