@@ -1,0 +1,7 @@
+{
+  "action": "overwrite",
+  "id": "/etc/nginx/sites-available/default-php",
+  "user": "root",
+  "group": "root",
+  "mode": "u=rw,g=r,o=r"
+}

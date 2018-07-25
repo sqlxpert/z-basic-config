@@ -1,0 +1,7 @@
+{
+  "action": "overwrite",
+  "id": "/var/www/html/index.php",
+  "user": "root",
+  "group": "root",
+  "mode": "u=rw,g=r,o=r"
+}

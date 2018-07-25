@@ -1,0 +1,4 @@
+{
+  "action": "delete",
+  "id": "/etc/nginx/sites-enabled/default"
+}

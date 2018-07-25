@@ -1,0 +1,7 @@
+{
+  "action": "overwrite",
+  "id": "/etc/php/7.2/fpm/php.ini",
+  "user": "root",
+  "group": "root",
+  "mode": "u=rw,g=r,o=r"
+}

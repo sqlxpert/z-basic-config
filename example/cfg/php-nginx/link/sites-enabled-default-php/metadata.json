@@ -1,0 +1,5 @@
+{
+  "action": "overwrite",
+  "id": "/etc/nginx/sites-enabled/default-php",
+  "target": "/etc/nginx/sites-available/default-php"
+}
