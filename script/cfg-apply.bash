@@ -159,10 +159,19 @@ do
               FILE_USER=$( jq --raw-output '.["user"]' "${ITEM_META}" )
               FILE_GROUP=$( jq --raw-output '.["group"]' "${ITEM_META}" )
               FILE_MODE=$( jq --raw-output '.["mode"]' "${ITEM_META}" )
-              sudo touch "${ITEM_ID}"
-              sudo chown "${FILE_USER}:${FILE_GROUP}" "${ITEM_ID}"
-              sudo chmod "${FILE_MODE}" "${ITEM_ID}"
-              sudo cp "${PROFILEDIR}/${ITEM_TYPE}/${ITEM_NAME}/source" "${ITEM_ID}"
+              
+              # For security, never popular a file before permissions are set.
+
+              # If file exists, update access time only (do not update modification timestamp):
+              sudo touch -a "${ITEM_ID}"
+              # These two update modification timestamp only if user/group
+              # or mode actually changes; print changes, for information:
+              sudo chown --changes "${FILE_USER}:${FILE_GROUP}" "${ITEM_ID}"
+              sudo chmod --changes "${FILE_MODE}" "${ITEM_ID}"
+              # Unlike cp, this copies only when contents change, otherwise preserving
+              # modification timestamp; print changes (crypitcally, alas):
+              sudo rsync --checksum --inplace --itemize-changes \
+                "${PROFILEDIR}/${ITEM_TYPE}/${ITEM_NAME}/source" "${ITEM_ID}"
               ;;
             'delete')
               sudo rm --force "${ITEM_ID}"
