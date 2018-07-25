@@ -80,6 +80,8 @@ PROFILES=$(
 # (one would have to spoof the EC2 metadata service) command injection risk.
 
 
+sudo apt-get update
+
 # Multiple configuration profiles can be applied to one EC2 instance.
 # Multiple profile names in the Profiles tag must be separated by spaces;
 # failure to do this simply produces no match on any profile name.
