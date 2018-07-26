@@ -13,14 +13,14 @@ Resources:
 
   ConfigBucket:
     Type: "AWS::S3::Bucket"
-    DeletionPolicy: Retain
+    DeletionPolicy: Delete
     Properties:
       VersioningConfiguration:
         Status: Enabled
 
   ConfigManagePolicy:
     Type: "AWS::IAM::ManagedPolicy"
-    DeletionPolicy: Retain
+    DeletionPolicy: Delete
     Properties:
       Description: "Config mgmt: S3 config store bucket: upload, list, download, delete objects; S3: list names of all buckets; EC2: set, delete Profiles instance tag and describe all resources; STS: decode permissions errors. Temporarily attach to EC2 instance role for instance from which files will be uploaded, etc., or to IAM user whose API key will be used on a non-EC2 system."
       PolicyDocument:
@@ -58,7 +58,7 @@ Resources:
 
   ConfigApplyPolicy:
     Type: "AWS::IAM::ManagedPolicy"
-    DeletionPolicy: Retain
+    DeletionPolicy: Delete
     Properties:
       Description: "Config mgmt: S3 config store bucket: list, download objects; S3: list names of all buckets; EC2: get all tags; STS: decode permissions errors. Permanently attach to EC2 instance role for managed instances."
       PolicyDocument:
@@ -83,14 +83,32 @@ Resources:
             Action: "sts:DecodeAuthorizationMessage"
             Resource: "*"
 
+  ConfigEc2InstProfilesTagLockPolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    DeletionPolicy: Delete
+    Properties:
+      Description: "Config mgmt: EC2 instances: prevent creation/modification and deletion of Profiles tag. Attach to untrusted IAM users and roles."
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Deny
+            Action:
+              - "ec2:CreateTags"
+              - "ec2:DeleteTags"
+            Resource: !Sub "arn:aws:ec2:*:${AWS::AccountId}:instance/*"
+            Condition:
+              "ForAnyValue:StringEquals":
+                "aws:TagKeys":
+                  - "Profiles"
+ 
   ConfigManagedEC2InstRole:
     Type: "AWS::IAM::Role"
-    DeletionPolicy: Retain
+    DeletionPolicy: Delete
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Effect: "Allow"
+          - Effect: Allow
             Principal:
               Service:
                 - "ec2.amazonaws.com"
@@ -101,19 +119,19 @@ Resources:
 
   ConfigManagedEC2InstProfile:
     Type: "AWS::IAM::InstanceProfile"
-    DeletionPolicy: Retain
+    DeletionPolicy: Delete
     Properties:
       Roles:
         - !Ref ConfigManagedEC2InstRole
 
   ConfigCentralEC2InstRole:
     Type: "AWS::IAM::Role"
-    DeletionPolicy: Retain
+    DeletionPolicy: Delete
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Effect: "Allow"
+          - Effect: Allow
             Principal:
               Service:
                 - "ec2.amazonaws.com"
@@ -124,14 +142,14 @@ Resources:
 
   ConfigCentralEC2InstProfile:
     Type: "AWS::IAM::InstanceProfile"
-    DeletionPolicy: Retain
+    DeletionPolicy: Delete
     Properties:
       Roles:
         - !Ref ConfigCentralEC2InstRole
 
   ConfigEc2InstLoginSecGrp:
     Type: "AWS::EC2::SecurityGroup"
-    DeletionPolicy: Retain
+    DeletionPolicy: Delete
     Properties:
       GroupDescription: !Sub "Config mgmt: Login access from public Internet. Attach to the central EC2 instance and all managed instances. Not safe for production!"
       VpcId: !Ref VpcId
@@ -148,7 +166,7 @@ Resources:
 
   ConfigEc2InstLoginSecGrp:
     Type: "AWS::EC2::SecurityGroup"
-    DeletionPolicy: Retain
+    DeletionPolicy: Delete
     Properties:
       GroupDescription: !Sub "Config mgmt: Login access from public Internet. Attach to the central EC2 instance and all managed instances. Not safe for production!"
       VpcId: !Ref VpcId
@@ -165,7 +183,7 @@ Resources:
 
   ConfigExampleWebSecGrp:
     Type: "AWS::EC2::SecurityGroup"
-    DeletionPolicy: Retain
+    DeletionPolicy: Delete
     Properties:
       GroupDescription: !Sub "Config mgmt: Web traffic from public Internet. Attach to managed EC2 instances (and load balancers, if present) when using a sample profile that defines a Web server, such as the php-nginx profile. Not safe for production without DDoS attack protection!"
       VpcId: !Ref VpcId
@@ -201,6 +219,11 @@ Outputs:
     Description: "Config mgmt: ARN of IAM policy allowing application of configurations"
     Export:
       Name: "IAMPol-ConfigApply-Arn"
+  ConfigEc2InstProfilesTagLockPolicyArn:
+    Value: !Ref ConfigEc2InstProfilesTagLockPolicy
+    Description: "Config mgmt: ARN of IAM policy protecting Profiles tag of EC2 instances"
+    Export:
+      Name: "IAMPol-Ec2InstProfilesTagLock-Arn"
   ConfigManagedEC2InstProfile:
     Value: !Ref ConfigManagedEC2InstProfile
     Description: "Config mgmt: name of IAM EC2 instance profile (container for instance role) for managed instances"
