@@ -1,7 +1,7 @@
 {
   "action": "overwrite",
   "id": "/var/www/html/index.php",
-  "user": "root",
-  "group": "root",
+  "user": "www-data",
+  "group": "www-data",
   "mode": "u=rw,g=r,o=r"
 }
