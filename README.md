@@ -73,7 +73,7 @@ Operations are **idempotent**: you can repeat them without trigerring any furthe
 
 14. In your Web browser, navigate to `http://PUBLIC_IP_ADDR` for each managed instance in turn. You should see a greeting.
 
-15. To minimize AWS charges, delete all stacks as soon as possible. The first stack can only be deleted after there are no more references to its policies, instance roles/profiles, or security groups, and its S3 bucket is empty.
+15. To minimize AWS charges, delete all stacks as soon as possible. The first stack can only be deleted after there are no more references to its policies, instance roles/profiles, or security groups, and its S3 bucket is empty (warning: deleting objects in the S3 Console does not automatically delete old object versions).
 
 ## Configuration Data Format
 
