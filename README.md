@@ -34,19 +34,19 @@ Operations are **idempotent**: you can repeat them without trigerring any furthe
 
    From your local system, run `ssh -i PRIVATE_KEY_FILE ubuntu@PUBLIC_IP_ADDR`
    
-   ```
+   ```bash
    sudo apt-get update
    sudo apt-get --assume-yes install git
    cd ~
    rm --recursive --force basic-config
    git clone 'https://github.com/sqlxpert/basic-config.git'
    chmod a+x basic-config/script/*
-   basic-config/script/bootstraph.bash
+   basic-config/script/bootstrap.bash
    ```
 
 10. If you wish to use password authentication (not recommended) rather than public key authentication, run the following commands on each instance. Type the new password for user `ubuntu` twice, and switch PasswordAuthentication to `yes` in the SSHD configuration.
 
-    ```
+    ```bash
     sudo passwd ubuntu
     sudo vi /etc/ssh/sshd_config
     sudo systemctl reload sshd
@@ -58,7 +58,7 @@ Operations are **idempotent**: you can repeat them without trigerring any furthe
 
 12. Upload the sample configuration data from the central instance to S3. Specify the region in which you created the CloudFormation stacks, and specify the bucket name from Step 5.
 
-    ```
+    ```bash
     AWS_DEFAULT_REGION=REGION; export AWS_DEFAULT_REGION
     aws s3 cp basic-config/example/cfg 's3://BUCKET_NAME' --recursive
     ```
@@ -67,7 +67,7 @@ Operations are **idempotent**: you can repeat them without trigerring any furthe
 
 13. On each managed instance, apply the configuration. This script downloads the selected profile from S3, installing operating system packages, populating files, creating symbolic links, and restarting services as instructed by the profile. Check the output for errors.
 
-    ```
+    ```bash
     basic-config/script/cfg-apply.bash BUCKET_NAME
     ```
 
@@ -127,7 +127,7 @@ profile/
 
 ## Triggering Updates
 
-1. Upload new configuration files to S3. See Step 12 in the [Instructions](#Instructions), above.
+1. Upload new configuration files to S3. See Step 12 in the [Instructions](#instructions), above.
 
 2. Run `cfg-apply.bash` on each managed instance. See Step 13.
 
@@ -166,7 +166,7 @@ The project turned out to be of limited relevance to operations work because, at
 
  * _populate file_ `my-file` _with_ `my-file-contents` ⟶
  
-   ```
+   ```bash
    cat << 'EOF' > my-file
    my-file-contents
    EOF
