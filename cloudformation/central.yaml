@@ -31,7 +31,7 @@ Resources:
             Resource: "*"
           - Effect: Allow
             Action:
-              - "s3:ListBucket"
+              - "s3:ListBucket*"
             Resource: !GetAtt ConfigBucket.Arn
           - Effect: Allow
             Action:  # Action wildcard supports versioned objects
