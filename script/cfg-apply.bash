@@ -7,7 +7,7 @@
 #  - Do not use for production
 #  - Simple error handling: any error causes script
 #    to exit. Examine output up to that point, and
-#    cached configuration data in `$CFGDIR` and `$CFGDIR_OLD`
+#    cached configuration data in $CFGDIR and $CFGDIR_OLD
 #  - No configuration management system can prevent a
 #    user from explicitly removing a crucial package,
 #    file, etc. -- whether intentionally or by accident
@@ -24,12 +24,22 @@
 #    system, so that the AWS CLI operating system package will be recent.
 #    Failing that, install the Python package.)
 #  - jq
-#  - User with passwordless sudo privileges (typically, `ubuntu`)
+#  - User with passwordless sudo privileges (typically, ubuntu)
+
+# Invocation:
+#    cfg-apply.bash BUCKET_NAME
+#      where BUCKET_NAME is the name of the S3 bucket for storing configuration data
 
 
 set -o errexit  # Exit script on any error
-set -o noglob  # Mitigate an injection risk when Profiles tag contains `*`
+set -o noglob  # Mitigate an injection risk when Profiles tag contains *
 
+
+if [ $# -ne 1 ]
+then
+  echo 'Usage: cfg-apply BUCKET_NAME'
+  exit 1
+fi
 
 # All jq calls involve:
 # 1. --raw-output , which strips quotes from an output string.
@@ -93,20 +103,21 @@ do
   echo "Profile: ${PROFILE}"
   echo
 
-  PROFILEDIR="${CFGDIR}/${PROFILE}"
-  mkdir "${PROFILEDIR}"
-  aws s3 cp "s3://paulm-basic-config/profile/${PROFILE}" "${PROFILEDIR}" --recursive
+  PROFILEDIR="${CFGDIR}/profile/${PROFILE}"
+  mkdir --parents "${PROFILEDIR}"
+  aws s3 cp "s3://${1}/profile/${PROFILE}" "${PROFILEDIR}" --recursive
   # Why repeat this for each profile instead of doing it once, for the whole configuration
   # hierarchy? To download only the applicable profiles. IAM policies attached to the EC2
   # instance role should be used to prevent access to other, potentially sensitive, profiles.
 
   # Security note: Quoting ensures that any expression containing components of an S3
-  # object key (PROFILEDIR is such a component, as is ITEM_NAME, below) is treated as a
-  # single word, mitigating the command injection risk. Other variables in those expressions
-  # are set to literal values inside this script (ITEM_TYPE, below, is an example), or
-  # are obtained from jq, which is always called with safeguards against command injection.
+  # object key (PROFILEDIR is such a component, as is ITEM_NAME, below) or a user-supplied
+  # parameter ($1, the bucket name) is treated as a single word, mitigating the command
+  # injection risk. Other variables in those expressions are set to literal values inside
+  # this script (ITEM_TYPE, below, is an example), or are obtained from jq, which is always
+  # called with safeguards against command injection.
 
-  PROFILEDIR_OLD="${CFGDIR_OLD}/${PROFILE}"
+  PROFILEDIR_OLD="${CFGDIR_OLD}/profile/${PROFILE}"
   PROFILE_CHANGED=1
   if [ -d "${PROFILEDIR_OLD}" ]
   then
@@ -222,7 +233,7 @@ do
         'svc')
           case $ITEM_ACTION in
             'reload'|'restart')
-              if [ $PROFILE_CHANGED -ne '0' ]
+              if [ $PROFILE_CHANGED -ne 0 ]
               then
                 sudo systemctl "${ITEM_ACTION}" "${ITEM_ID}"
               fi
