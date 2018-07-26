@@ -160,23 +160,6 @@ Resources:
           CidrIp: "0.0.0.0/0"
           Description: "SSH from public Internet. Not safe for production!"
 
-  ConfigEc2InstLoginSecGrp:
-    Type: "AWS::EC2::SecurityGroup"
-    DeletionPolicy: Delete
-    Properties:
-      GroupDescription: !Sub "Config mgmt: Login access from public Internet. Attach to the central EC2 instance and all managed instances. Not safe for production!"
-      VpcId: !Ref VpcId
-      SecurityGroupEgress:
-        - IpProtocol: "-1"  # All traffic
-          CidrIp: "127.0.0.1/32"  # Loopback interface
-          Description: "Dummy to prevent CloudFormation from automatically creating a rule allowing all outbound traffic"
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: "0.0.0.0/0"
-          Description: "SSH from public Internet. Not safe for production!"
-
   ConfigExampleWebSecGrp:
     Type: "AWS::EC2::SecurityGroup"
     DeletionPolicy: Delete
