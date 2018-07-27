@@ -97,13 +97,13 @@ profile/
         metadata.json
 ```
 
-* Configuration files are stored centrally, in S3. S3 allows white space and other dangerous characters in object keys, but the use of any characters other than letters, numbers, hyphens and underscores can cause errors in `cfg-apply.bash`.
+* Configuration files are stored centrally, in S3. S3 allows white space and other dangerous characters in object keys, but the use of any characters other than letters, numbers, hyphens, underscores and periods can cause errors in `cfg-apply.bash`.
 
 * Every profile has a human-readable logical identifier (profile name). To apply more than one profile to the same managed EC2 instance, separate multiple profile names with spaces, in the instance's `Profiles` tag.
 
 * Every item has a human-readable logical identifier (item name).
 
-* Because no formal dependency system is provided, profiles are applied in the order in which they appear in the `Profiles` tag; item types are processed in a fixed, practial order (install packages ⟶ populate file  ⟶ create symbolic links ⟶ restart services); and items of the same type are processed in alphabetical order by item name. Prepend numbers to item names to control processing order within an item type.
+* Because no formal dependency system is provided, profiles are applied in the order in which they appear in the `Profiles` tag; item types are processed in a fixed, practial order (install packages ⟶ populate files ⟶ create symbolic links ⟶ restart services); and items of the same type are processed in alphabetical order by item name. Prepend numbers to item names to control processing order within an item type.
 
 * Each item has a metadata file, which must contain a JSON object. All values are quoted strings of at least one of: the letters `a` through `z` and `A` through `Z` , the numbers `0` through `9` , and certain other characters, `-` `_` `.` `,` `+` `=`  `/`
 
@@ -121,7 +121,7 @@ profile/
   |Type|Action|Additional required key(s)|Notes|
   |--|--|--|--|
   |`file`|`overwrite`|`user` `group` `mode`|User and group must already exist. Use symbolic modes, which are always easy to interpret.|
-  |`svc`|`overwrite`|`target`|Target is the full pathname of the file to which the symbolic link points (the real file, in other words).|
+  |`link`|`overwrite`|`target`|Target is the full pathname of the file to which the symbolic link points (the real file, in other words).|
 
 * Each file item also requires a `source` file, which contains the contents of the file.
 
@@ -174,7 +174,7 @@ The project turned out to be of limited relevance to operations work because, at
    
    (Note the obvious command injection risk, which would have to be mitigated.)
 
-Instead of implementing a small subset of the features of Salt, Ansible, Puppet, or Chef without the rich _semantics_ that make those products useful (for example, the ability to specify popular packages without worrying which Linux distribution is present on a given managed system, the ability to apply configuration changes in order, based on formal dependencies, and the possibility that dependency logic will catch configuration specification errors such as deletion of a Linux user who still owns files tracked by the configuration management system), it might be instructive to demonstrate how one or more existing products can be used to solve a configuration problem.
+Instead of implementing a small subset of the features of SaltStack, Ansible, Puppet, or Chef without the rich _semantics_ that make those products useful (for example, the ability to specify popular packages without worrying which Linux distribution is present on a given managed system, the ability to apply configuration changes in order, based on formal dependencies, and the possibility that dependency logic will catch configuration specification errors such as deletion of a Linux user who still owns files tracked by the configuration management system), it might be instructive to demonstrate how one or more existing products can be used to solve a configuration problem.
 
 I will add that this project included Trojan horse requirements. I dismiss one, service restart after operating system package updates, in a comment in [`script/cfg-apply.bash`](/script/cfg-apply.bash).
 
