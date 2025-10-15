@@ -154,7 +154,7 @@ profile/
 
 ## Commentary
 
-I developed this demonstration quickly, for a particular organization. It should not be used for production. 
+I developed this demonstration quickly. It should not be used for production. A response to a take-home exercise for a database reliability engineering position at Slack, it helped me get hired there in 2018.
 
 The project turned out to be of limited relevance to operations work because, at a fundamental level, it involved writing an interpreter. In the following transformations, the choice of any particular LHS (left-hand side) syntax is completely irrelevant to the resulting shell command:
 
